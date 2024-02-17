@@ -155,8 +155,9 @@ function CollectionData({data}: {data: Meeting[]}) {
                           color: '#FFF',
                           textAlign: 'center',
                         }}
-                        clickAction="OPEN_URI"
+                        clickAction="OPEN_URI" //This cause error
                         clickActionData={{
+                          //This cause error
                           uri: `${baseDeepLink}${event.id}`,
                         }}
                       />

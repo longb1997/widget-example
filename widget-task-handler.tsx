@@ -2,11 +2,19 @@ import React from 'react';
 import type {WidgetTaskHandlerProps} from 'react-native-android-widget';
 import {CalendarWidget} from './CalendarWidget';
 import {Linking} from 'react-native';
+import {Meeting} from './widgetUtils';
 
 const nameToWidget = {
-  // Reminder: ReminderWidget,
   Calendar: CalendarWidget,
 };
+
+const SAMPLE_DATA: Meeting[] = [
+  {id: '1', name: 'Mobile meeting 1', time: '1706759540', duration: '30'},
+  {id: '2', name: 'Mobile meeting 2', time: '1707623540', duration: '30'},
+  {id: '3', name: 'Mobile meeting 3', time: '1707709940', duration: '30'},
+  {id: '4', name: 'Mobile meeting 4', time: '1707709940', duration: '30'},
+  {id: '5', name: 'Mobile meeting 5', time: '1709005940', duration: '30'},
+];
 
 export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
   const widgetInfo = props.widgetInfo;
@@ -22,7 +30,7 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
         // Call API here and send data to Widget
         // const meetings = await requestCalendarData();
 
-        const meetings: any = [];
+        const meetings: any = SAMPLE_DATA;
 
         if (meetings) {
           props.renderWidget(<Widget {...widgetInfo} data={meetings} />);
@@ -37,13 +45,9 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
     case 'WIDGET_CLICK':
       if (props.clickAction === 'RELOAD_WIDGET') {
         // Re-call API when click "reload" icon
-        // TODO: Create an "reload" icon
-        // Do stuff when primitive with `clickAction="RELOAD_WIDGET"` is clicked
-        // props.clickActionData === { id: 0 }
         try {
           //   const meetings = await requestCalendarData();
-          const meetings: any = [];
-
+          const meetings: any = SAMPLE_DATA;
           props.renderWidget(<Widget {...widgetInfo} data={meetings} />);
         } catch (error: any) {
           props.renderWidget(

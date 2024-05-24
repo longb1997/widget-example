@@ -4,17 +4,17 @@ import React from 'react';
 import {
   FlexWidget,
   ListWidget,
+  OverlapWidget,
   SvgWidget,
   TextWidget,
   TextWidgetProps,
+  WidgetInfo,
 } from 'react-native-android-widget';
 import {TextWidgetStyle} from 'react-native-android-widget/src/widgets/TextWidget';
 import {
   Meeting,
   NO_ACCESS_ERROR,
   baseDeepLink,
-  svgRefresh,
-  svgStringPlus,
 } from './widgetUtils';
 
 interface ISTextWidget extends TextWidgetProps {
@@ -40,238 +40,172 @@ function STextWidget({
   );
 }
 
-function CollectionData({data}: {data: Meeting[]}) {
-  const daysOfWeek = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-
-  const today = moment();
-  const startDay = today.clone().startOf('month').startOf('week');
-  const endDay = today.clone().endOf('month').endOf('week');
-  let date = startDay.clone().subtract(1, 'day');
-
-  const daysMatrix = [];
-  while (date.isBefore(endDay, 'day')) {
-    daysMatrix.push(
-      Array(7)
-        .fill(0)
-        .map(() => date.add(1, 'day').clone()),
-    );
-  }
-
-  const isSameMonth = (day: moment.Moment) => {
-    return day.isSame(today, 'month');
-  };
-
-  const getEventsForDay = (day: moment.Moment) => {
-    if (!data) return [];
-    return data.filter(event =>
-      day.isSame(moment.unix(parseInt(event.time)), 'day'),
-    );
-  };
-
-  return (
-    <ListWidget
-      style={{
-        height: 'match_parent',
-        width: 'match_parent',
-      }}>
-      <FlexWidget
-        style={{
-          width: 'match_parent',
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-around',
-          marginBottom: 5,
-        }}>
-        {daysOfWeek.map((weekday, index) => (
-          <STextWidget
-            text={weekday}
-            textStyle={{
-              fontSize: 14,
-              width: 40,
-              textAlign: 'center',
-              color: index === 6 ? '#d63031' : '#FFF',
-            }}
-          />
-        ))}
-      </FlexWidget>
-      <FlexWidget
-        style={{
-          width: 'match_parent',
-          backgroundColor: '#636e72',
-          height: 1,
-        }}
-      />
-      <FlexWidget
-        style={{
-          width: 'match_parent',
-          alignItems: 'center',
-          height: 'match_parent',
-        }}>
-        {daysMatrix.map((week, index) => (
-          <FlexWidget
-            key={index}
-            style={{
-              width: 'match_parent',
-              flexDirection: 'row',
-              justifyContent: 'space-around',
-              alignItems: 'center',
-            }}>
-            {week.map((day, dayIndex) => {
-              const isCurrentDay = day.isSame(moment(), 'day');
-              const eventOfTheDay = getEventsForDay(day);
-              return (
-                <FlexWidget
-                  style={{
-                    width: 40,
-                    height: 60,
-                  }}>
-                  <STextWidget
-                    text={day.format('D')}
-                    key={day.format('DDMMYYYY')}
-                    textStyle={{
-                      textAlign: 'center',
-                      color: isCurrentDay
-                        ? '#74b9ff'
-                        : isSameMonth(day)
-                        ? dayIndex === 6
-                          ? '#d63031'
-                          : '#FFF'
-                        : '#636e72',
-                      fontSize: 14,
-                      width: 'match_parent',
-                    }}
-                  />
-                  <FlexWidget style={{marginTop: 4, width: 40}}>
-                    {eventOfTheDay.slice(0, 1).map(event => (
-                      <STextWidget
-                        truncate={'END'}
-                        maxLines={1}
-                        text={event.name}
-                        key={event.id}
-                        textStyle={{
-                          fontSize: 10,
-                          width: 'match_parent',
-                          backgroundColor: '#74b9ff',
-                          color: '#FFF',
-                          textAlign: 'center',
-                        }}
-                        clickAction="OPEN_URI" //This cause error
-                        clickActionData={{
-                          //This cause error
-                          uri: `${baseDeepLink}${event.id}`,
-                        }}
-                      />
-                    ))}
-                    {eventOfTheDay.length > 1 && (
-                      <STextWidget
-                        text={`+${eventOfTheDay.length - 1}`}
-                        textStyle={{
-                          width: 'match_parent',
-                          fontSize: 10,
-                          color: '#74b9ff',
-                          marginTop: 2,
-                          textAlign: 'center',
-                        }}
-                      />
-                    )}
-                  </FlexWidget>
-                </FlexWidget>
-              );
-            })}
-          </FlexWidget>
-        ))}
-      </FlexWidget>
-    </ListWidget>
-  );
+function calculateEventHeight(meeting: Meeting, hourHeight: number) {
+  let eventDuration = (Number(meeting.duration) || 0) <= 20 ? 20 : Number(meeting.duration);
+  let eventDurationHours = eventDuration / 60; // Convert minutes to hours
+  return hourHeight * eventDurationHours - 2;
 }
 
-function ErrorView({error}: {error: string}) {
-  if (
-    NO_ACCESS_ERROR.some((errorCode: (typeof NO_ACCESS_ERROR)[number]) =>
-      error.includes(errorCode),
-    )
-  ) {
-    return (
-      <FlexWidget
-        style={{
-          width: 'match_parent',
-          height: 'match_parent',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
-        <STextWidget
-          text="Vui lòng đăng nhập để sử dụng Widget!"
-          textStyle={{fontSize: 18, color: '#FFF'}}
-        />
-      </FlexWidget>
-    );
-  }
+function calculateEventTopOffset(meeting: Meeting, hourHeight: number, index: number) {
+  let PADDING_TITLE = 8;
+  let eventStartTime = moment(meeting.time, 'X');
+  let eventStartMinute = eventStartTime.minute();
+  let minuteOffset = (eventStartMinute / 60) * (hourHeight) + (index * hourHeight)
+  return minuteOffset + PADDING_TITLE;
+}
 
+function calculateEventOffsetX(widgetWidth: number, meetingIndex: number){
+  let eventWidth = widgetWidth / 4
+  return meetingIndex * eventWidth + (widgetWidth / 7 + (4 * meetingIndex))
+}
+
+function MeetingItem({meeting, widgetWidth, hourHeight, index, meetingIndex}: {meeting: Meeting; widgetWidth: number; hourHeight: number, index: number, meetingIndex: number}) {
+  const meetingTime = moment(meeting.time, 'X');
+  let eventHeight = calculateEventHeight(meeting, hourHeight);
+  let eventTopOffset = calculateEventTopOffset(meeting, hourHeight, index);
+  let eventOffsetX = calculateEventOffsetX(widgetWidth, meetingIndex)
   return (
     <FlexWidget
+      key={meeting.id}
+      clickAction="OPEN_MEETING"
+      clickActionData={{
+        uri: `${baseDeepLink}${meeting.id}`,
+      }}
       style={{
-        width: 'match_parent',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
+        height: eventHeight,
+        backgroundColor: '#FFF',
+        borderRadius: 4,
+        width: widgetWidth / 4,
+        marginTop: eventTopOffset,
+        marginLeft: eventOffsetX,
+        borderColor: '#1E88E5',
+        borderWidth: 1,
+      }}
+    >
       <STextWidget
-        text={`Something wrong: ${error}`}
-        textStyle={{fontSize: 18, color: '#FFF'}}
+        truncate="END"
+        maxLines={1}
+        text={`${meeting.name} - ${meetingTime}`}
+        type={'bold'}
+        textStyle={{
+          fontSize: 8,
+          color: '#2F3139',
+          paddingHorizontal: 2
+        }}
       />
     </FlexWidget>
   );
 }
 
+function CollectionData({
+  widgetInfo,
+  currentHour,
+  eventsGroupedByHour,
+}: {
+  widgetInfo: any;
+  currentHour: number;
+  eventsGroupedByHour: Record<number, Meeting[]>;
+}) {
+  const widgetWidth = widgetInfo?.width;
+  const hours = Array.from({length: 8}, (_, index) => currentHour - 2 + index);
+  const hourHeight = widgetInfo?.height / 8;
+
+  return (
+    <OverlapWidget
+      style={{
+        height: 'match_parent',
+        width: 'match_parent',
+      }}
+    >
+      {hours.map((hour, index) => {
+        return (
+          <FlexWidget
+            style={{
+              width: 'match_parent',
+              height: hourHeight,
+              marginTop: index * hourHeight,
+            }}
+          >
+            <FlexWidget
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 'match_parent',
+              }}
+            >
+              <STextWidget
+                text={`${hour}:00`}
+                type="bold"
+                textStyle={{
+                  fontSize: 10,
+                  width: widgetWidth / 9,
+                  paddingHorizontal: 2,
+                }}
+              />
+              <FlexWidget style={{width: widgetWidth / 1.3, height: 1, backgroundColor: '#000000'}} />
+            </FlexWidget>
+          </FlexWidget>
+        );
+      })}
+      {hours.map((hour, index) => {
+        let eventsThisHour = eventsGroupedByHour[hour] ?? [];
+        return (
+          <OverlapWidget style={{width:'match_parent', height:'match_parent'}}>
+            {eventsThisHour.map((meeting, meetingIndex) => (
+              <MeetingItem hourHeight={hourHeight} meeting={meeting} widgetWidth={widgetWidth} index={index} meetingIndex={meetingIndex}/>
+            ))}
+          </OverlapWidget>
+        );
+      })}
+    </OverlapWidget>
+  );
+}
+
+const groupEventsByHour = (events: Meeting[], currentHour: number) => {
+  const groupedEvents: Record<number, Meeting[]> = {};
+
+  let eventsToday = events.filter((event: Meeting) => moment(event?.time || 0, 'X').isSame(moment(), 'day'));
+
+  for (const event of eventsToday) {
+    const eventDate = moment(event.time, 'X');
+    const eventHour = eventDate.hour();
+
+    if (eventHour >= currentHour - 2 && eventHour <= currentHour + 5) {
+      groupedEvents[eventHour] = groupedEvents[eventHour] || [];
+      groupedEvents[eventHour].push(event);
+    }
+  }
+
+  return groupedEvents;
+};
+
 export function CalendarWidget({
   data,
-  error = '',
+  widgetInfo,
 }: {
   data: Meeting[];
   error?: string;
+  loading?: boolean;
+  widgetInfo: WidgetInfo;
 }) {
+  const currentHour = moment('1716507317', 'X').hour();
+  const groupedByHour = groupEventsByHour(data, currentHour);
+
   return (
     <FlexWidget
       style={{
         height: 'match_parent',
         width: 'match_parent',
-        backgroundColor: '#000',
+        backgroundColor: '#F0F0F1',
         paddingHorizontal: 16,
-        paddingTop: 16,
-        borderRadius: 16,
-      }}>
-      <FlexWidget
-        style={{
-          width: 'match_parent',
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingBottom: 16,
-        }}>
-        <STextWidget
-          text={moment().format('MM/YY')}
-          textStyle={{
-            textAlign: 'left',
-            fontSize: 14,
-            color: '#FFF',
-          }}
-        />
-        <FlexWidget style={{flexDirection: 'row', alignItems: 'center'}}>
-          <SvgWidget
-            svg={svgRefresh}
-            style={{height: 20, width: 20}}
-            clickAction="RELOAD_WIDGET"
-          />
-          <SvgWidget
-            svg={svgStringPlus}
-            style={{height: 20, width: 20, marginLeft: 8}}
-            clickAction="OPEN_URI"
-            clickActionData={{
-              uri: `${baseDeepLink}`,
-            }}
-          />
-        </FlexWidget>
-      </FlexWidget>
-      {error ? <ErrorView error={error} /> : <CollectionData data={data} />}
+      }}
+    >
+      <CollectionData
+        eventsGroupedByHour={groupedByHour}
+        widgetInfo={widgetInfo}
+        currentHour={currentHour}
+      />
     </FlexWidget>
   );
 }
